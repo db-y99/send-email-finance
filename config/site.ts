@@ -9,6 +9,10 @@ export const siteConfig = {
       href: "/",
     },
     {
+      label: "Giải ngân",
+      href: "/disbursement",
+    },
+    {
       label: "Docs",
       href: "/docs",
     },
