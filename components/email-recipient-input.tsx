@@ -6,7 +6,7 @@ import { Chip } from "@heroui/chip";
 // Hoist RegExp to module scope (rule 7.9)
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-interface EmailRecipientInputProps {
+type TEmailRecipientInputProps = {
   label: string;
   value: string[];
   onChange: (emails: string[]) => void;
@@ -16,7 +16,7 @@ interface EmailRecipientInputProps {
   description?: string;
   suggestions?: string[];
   placeholder?: string;
-}
+};
 
 export function EmailRecipientInput({
   label,
@@ -28,7 +28,7 @@ export function EmailRecipientInput({
   description,
   suggestions = [],
   placeholder = "Nhập email...",
-}: EmailRecipientInputProps) {
+}: TEmailRecipientInputProps) {
   const [inputValue, setInputValue] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);

@@ -1,217 +1,113 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
-import { LoanDisbursementData } from "@/types/loan-disbursement";
+import { TLoanDisbursementData, LoanDisbursementSchema } from "@/types/loan-disbursement";
 import { renderEmailHTML, getEmailSubject } from "@/lib/email-template";
-import { EMAIL_REGEX } from "@/constants/email";
 import { parseCCEmails } from "@/lib/email";
+import { createError } from "@/lib/errors";
+import { ok, err, isErr } from "@/types/result.types";
+import { z } from "zod";
 
 /**
  * API Route để gửi email thông báo giải ngân
- * 
- * Pseudocode logic gửi email:
- * 
- * 1. Nhận dữ liệu từ request body
- * 2. Validate dữ liệu đầu vào
- * 3. Render email HTML từ template và dữ liệu
- * 4. Tạo subject line
- * 5. Gửi email qua SMTP (cần tích hợp thư viện như nodemailer, sendgrid, etc.)
- * 
- * Ví dụ với nodemailer:
- * 
- * import nodemailer from 'nodemailer';
- * 
- * const transporter = nodemailer.createTransport({
- *   host: process.env.SMTP_HOST,
- *   port: parseInt(process.env.SMTP_PORT || '587'),
- *   secure: false,
- *   auth: {
- *     user: process.env.SMTP_USER,
- *     pass: process.env.SMTP_PASSWORD,
- *   },
- * });
- * 
- * await transporter.sendMail({
- *   from: process.env.FROM_EMAIL || 'finance@y99.vn',
- *   to: data.customer_email,
- *   subject: subject,
- *   html: emailHTML,
- * });
+ * Sử dụng Zod cho validation và Result pattern cho error handling
  */
 
 export async function POST(request: NextRequest) {
   try {
-    // Parse FormData (supports both JSON and FormData)
+    // 1. Parse dữ liệu từ request
     const contentType = request.headers.get("content-type") || "";
-    let data: Partial<LoanDisbursementData> = {};
+    let rawData: any = {};
     let attachments: File[] = [];
 
     if (contentType.includes("multipart/form-data")) {
-      // Handle FormData with file uploads
       const formData = await request.formData();
       
       // Extract text fields
-      data = {
-        customer_name: formData.get("customer_name") as string,
-        customer_email: formData.get("customer_email") as string,
-        cc_emails: formData.get("cc_emails") as string | undefined,
-        contract_code: formData.get("contract_code") as string,
+      rawData = {
+        customer_name: formData.get("customer_name"),
+        customer_email: formData.get("customer_email"),
+        cc_emails: formData.get("cc_emails") || undefined,
+        contract_code: formData.get("contract_code"),
         disbursement_amount: parseFloat(formData.get("disbursement_amount") as string),
-        disbursement_date: formData.get("disbursement_date") as string,
+        disbursement_date: formData.get("disbursement_date"),
         total_loan_amount: parseFloat(formData.get("total_loan_amount") as string),
         loan_term_months: parseInt(formData.get("loan_term_months") as string),
-        loan_start_date: formData.get("loan_start_date") as string,
-        loan_end_date: formData.get("loan_end_date") as string,
+        loan_start_date: formData.get("loan_start_date"),
+        loan_end_date: formData.get("loan_end_date"),
         due_day_each_month: parseInt(formData.get("due_day_each_month") as string),
-        bank_name: formData.get("bank_name") as string,
-        bank_account_number: formData.get("bank_account_number") as string,
-        beneficiary_name: formData.get("beneficiary_name") as string,
+        bank_name: formData.get("bank_name"),
+        bank_account_number: formData.get("bank_account_number"),
+        beneficiary_name: formData.get("beneficiary_name"),
       };
 
       // Extract files
       const files = formData.getAll("attachments") as File[];
       attachments = files.filter((file) => file instanceof File && file.size > 0);
+      rawData.attachments = attachments;
     } else {
-      // Handle JSON (backward compatibility)
-      const jsonData = await request.json();
-      data = jsonData;
-      // Note: JSON cannot contain File objects, so attachments will be empty
-      attachments = [];
+      rawData = await request.json();
     }
 
-    // Validate required fields
-    const requiredFields: (keyof LoanDisbursementData)[] = [
-      "customer_name",
-      "customer_email",
-      "contract_code",
-      "disbursement_amount",
-      "disbursement_date",
-      "total_loan_amount",
-      "loan_term_months",
-      "loan_start_date",
-      "loan_end_date",
-      "due_day_each_month",
-      "bank_name",
-      "bank_account_number",
-      "beneficiary_name",
-    ];
-
-    for (const field of requiredFields) {
-      if (!data[field]) {
-        return NextResponse.json(
-          { error: `Thiếu trường bắt buộc: ${field}` },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Type assertion after validation - all required fields are present
-    const validatedData = data as LoanDisbursementData;
-
-    // Validate email format - early return (rule 7.8)
-    if (!EMAIL_REGEX.test(validatedData.customer_email)) {
-      return NextResponse.json(
-        { error: "Email TO không hợp lệ" },
-        { status: 400 }
+    // 2. Validate với Zod (Rule 12.0 in project-rules.mdc)
+    const validationResult = LoanDisbursementSchema.safeParse(rawData);
+    
+    if (!validationResult.success) {
+      const errorDetails = validationResult.error.errors.map(e => ({
+        path: e.path.join('.'),
+        message: e.message
+      }));
+      
+      const validationError = createError.validation(
+        "Dữ liệu không hợp lệ",
+        errorDetails
       );
+      
+      return NextResponse.json({ ok: false, error: validationError }, { status: 400 });
     }
 
-    // Parse and validate CC emails
+    const validatedData = validationResult.data;
+
+    // 3. Xử lý logic phụ (CC emails)
     const ccEmails = parseCCEmails(validatedData.cc_emails);
     if (validatedData.cc_emails && ccEmails.length === 0) {
-      return NextResponse.json(
-        { error: "Tất cả email CC không hợp lệ" },
-        { status: 400 }
-      );
+      return NextResponse.json({ 
+        ok: false, 
+        error: createError.validation("Email CC không hợp lệ") 
+      }, { status: 400 });
     }
 
-    // Render email HTML
+    // 4. Render email content
     const emailHTML = renderEmailHTML(validatedData);
     const subject = getEmailSubject(validatedData.contract_code);
 
-    // Use after() for non-blocking logging (rule 3.7)
-    after(async () => {
-      // Logging happens after response is sent
-      console.log("=== EMAIL SEND REQUEST ===");
-      console.log("To:", validatedData.customer_email);
-      if (ccEmails.length > 0) {
-        console.log("CC:", ccEmails.join(", "));
-      }
-      if (attachments.length > 0) {
-        console.log("Attachments:", attachments.map((f) => f.name).join(", "));
-      }
-      console.log("Subject:", subject);
-      console.log("HTML Length:", emailHTML.length);
-      console.log("========================");
-    });
-
-    // Simulate email sending delay
+    // 5. Gửi email (Mock delay)
+    // Trong thực tế, đây sẽ là một service function trả về Result
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    // Trong môi trường production, bạn sẽ gửi email thật ở đây:
-    /*
-    import nodemailer from 'nodemailer';
-    
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD,
-      },
+    // 6. Logging không chặn response (Rule 3.7 in project-rules.mdc)
+    after(async () => {
+      console.log("=== EMAIL SEND SUCCESS ===");
+      console.log("To:", validatedData.customer_email);
+      if (ccEmails.length > 0) console.log("CC:", ccEmails.join(", "));
+      console.log("Subject:", subject);
+      console.log("==========================");
     });
 
-    // Prepare attachments for email
-    // Convert File objects to buffers for nodemailer
-    const emailAttachments = await Promise.all(
-      attachments.map(async (file) => {
-        const arrayBuffer = await file.arrayBuffer();
-        return {
-          filename: file.name,
-          content: Buffer.from(arrayBuffer),
-          contentType: file.type || undefined,
-        };
-      })
-    );
-
-    const mailOptions = {
-      from: process.env.FROM_EMAIL || 'finance@y99.vn',
-      to: validatedData.customer_email,
-      ...(ccEmails.length > 0 && { cc: ccEmails.join(", ") }),
-      subject: subject,
-      html: emailHTML,
-      ...(emailAttachments.length > 0 && { attachments: emailAttachments }),
-    };
-
-    const info = await transporter.sendMail(mailOptions);
-    console.log('Email sent:', info.messageId);
-    */
-
+    // 7. Trả về kết quả thành công theo Result pattern (Rule 5.0 in error-handling.mdc)
     return NextResponse.json({
-      success: true,
-      message: "Email đã được gửi thành công",
+      ok: true,
       data: {
         to: validatedData.customer_email,
-        ...(ccEmails.length > 0 && { cc: ccEmails }),
-        ...(attachments.length > 0 && {
-          attachments: attachments.map((f) => ({
-            name: f.name,
-            size: f.size,
-            type: f.type,
-          })),
-        }),
         subject: subject,
         sentAt: new Date().toISOString(),
       },
     });
+
   } catch (error) {
-    console.error("Error in send-email API:", error);
-    return NextResponse.json(
-      {
-        error: "Lỗi khi xử lý yêu cầu gửi email",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
+    console.error("Critical error in send-email API:", error);
+    const serverError = createError.server(
+      error instanceof Error ? error.message : "Đã có lỗi hệ thống xảy ra"
     );
+    return NextResponse.json({ ok: false, error: serverError }, { status: 500 });
   }
 }

@@ -3,7 +3,7 @@
  * Template này sử dụng placeholders {{field_name}} để render dữ liệu động
  */
 
-import { LoanDisbursementData } from "@/types/loan-disbursement";
+import { TLoanDisbursementData } from "@/types/loan-disbursement";
 import { formatCurrency } from "./currency";
 
 /**
@@ -107,7 +107,7 @@ function formatDate(dateString: string): string {
  * @param logoUrl - URL của logo (optional, mặc định sẽ dùng /logo.png với base URL từ env)
  */
 export function renderEmailHTML(
-  data: LoanDisbursementData,
+  data: TLoanDisbursementData,
   logoUrl?: string
 ): string {
   const disbursementAmountWords = numberToVietnameseWords(data.disbursement_amount);

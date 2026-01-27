@@ -4,14 +4,14 @@
  * File này mô tả cách tích hợp SMTP thật vào hệ thống
  */
 
-import { LoanDisbursementData } from "@/types/loan-disbursement";
+import { TLoanDisbursementData } from "@/types/loan-disbursement";
 import { renderEmailHTML, getEmailSubject } from "./email-template";
 
 /**
  * Interface cho email service
  */
 export interface EmailService {
-  sendEmail(data: LoanDisbursementData): Promise<EmailSendResult>;
+  sendEmail(data: TLoanDisbursementData): Promise<EmailSendResult>;
 }
 
 export interface EmailSendResult {
@@ -43,7 +43,7 @@ export interface EmailSendResult {
  * 
  * 3. Gửi email:
  * 
- * async function sendEmail(data: LoanDisbursementData): Promise<EmailSendResult> {
+ * async function sendEmail(data: TLoanDisbursementData): Promise<EmailSendResult> {
  *   try {
  *     const emailHTML = renderEmailHTML(data);
  *     const subject = getEmailSubject(data.contract_code);
@@ -83,7 +83,7 @@ export interface EmailSendResult {
  * 
  * 3. Gửi email:
  * 
- * async function sendEmailWithSendGrid(data: LoanDisbursementData): Promise<EmailSendResult> {
+ * async function sendEmailWithSendGrid(data: TLoanDisbursementData): Promise<EmailSendResult> {
  *   try {
  *     const emailHTML = renderEmailHTML(data);
  *     const subject = getEmailSubject(data.contract_code);
@@ -130,7 +130,7 @@ export interface EmailSendResult {
  * 
  * 3. Gửi email:
  * 
- * async function sendEmailWithSES(data: LoanDisbursementData): Promise<EmailSendResult> {
+ * async function sendEmailWithSES(data: TLoanDisbursementData): Promise<EmailSendResult> {
  *   try {
  *     const emailHTML = renderEmailHTML(data);
  *     const subject = getEmailSubject(data.contract_code);
@@ -182,7 +182,7 @@ export interface EmailSendResult {
  * 
  * 3. Gửi email:
  * 
- * async function sendEmailWithResend(data: LoanDisbursementData): Promise<EmailSendResult> {
+ * async function sendEmailWithResend(data: TLoanDisbursementData): Promise<EmailSendResult> {
  *   try {
  *     const emailHTML = renderEmailHTML(data);
  *     const subject = getEmailSubject(data.contract_code);
@@ -217,7 +217,7 @@ export interface EmailSendResult {
 /**
  * Helper function để validate email trước khi gửi
  */
-export function validateEmailData(data: LoanDisbursementData): {
+export function validateEmailData(data: TLoanDisbursementData): {
   valid: boolean;
   errors: string[];
 } {

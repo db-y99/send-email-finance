@@ -1,49 +1,45 @@
+import { z } from "zod";
+import { EMAIL_REGEX } from "@/constants/email";
+
 /**
- * Schema dữ liệu cho thông báo giải ngân khoản vay
+ * Zod Schema cho thông báo giải ngân khoản vay (Rule 12.0 in project-rules.mdc)
  */
+export const LoanDisbursementSchema = z.object({
+  customer_name: z.string().min(1, "Họ và tên khách hàng là bắt buộc"),
+  customer_email: z.string().email("Email không hợp lệ").regex(EMAIL_REGEX, "Email không hợp lệ"),
+  cc_emails: z.string().optional(),
+  contract_code: z.string().min(1, "Số hợp đồng là bắt buộc"),
+  disbursement_amount: z.number().positive("Số tiền giải ngân phải lớn hơn 0"),
+  disbursement_date: z.string().min(1, "Ngày giải ngân là bắt buộc"),
+  total_loan_amount: z.number().positive("Tổng số vốn vay phải lớn hơn 0"),
+  loan_term_months: z.number().int().positive("Thời hạn vay phải lớn hơn 0"),
+  loan_start_date: z.string().min(1, "Ngày bắt đầu vay là bắt buộc"),
+  loan_end_date: z.string().min(1, "Ngày kết thúc vay là bắt buộc"),
+  due_day_each_month: z.number().int().min(1).max(31, "Ngày đến hạn phải từ 1 đến 31"),
+  bank_name: z.string().min(1, "Tên ngân hàng là bắt buộc"),
+  bank_account_number: z.string().min(1, "Số tài khoản là bắt buộc"),
+  beneficiary_name: z.string().min(1, "Tên người thụ hưởng là bắt buộc"),
+  attachments: z.array(z.any()).optional(),
+});
 
-export interface LoanDisbursementData {
-  // Thông tin khách hàng
-  customer_name: string;
-  customer_email: string; // TO email (required)
-  cc_emails?: string; // CC emails (optional, comma-separated)
-
-  // Thông tin hợp đồng
-  contract_code: string;
-
-  // Thông tin giải ngân
-  disbursement_amount: number;
-  disbursement_date: string; // Format: YYYY-MM-DD
-
-  // Thông tin khoản vay
-  total_loan_amount: number;
-  loan_term_months: number;
-  loan_start_date: string; // Format: YYYY-MM-DD
-  loan_end_date: string; // Format: YYYY-MM-DD
-  due_day_each_month: number; // Ngày đến hạn hàng tháng (1-31)
-
-  // Thông tin ngân hàng
-  bank_name: string;
-  bank_account_number: string;
-  beneficiary_name: string;
-
-  // File đính kèm (optional)
-  attachments?: File[];
-}
+/**
+ * Type alias cho dữ liệu giải ngân (Rule 6.0 in performance-rules.mdc)
+ */
+export type TLoanDisbursementData = z.infer<typeof LoanDisbursementSchema>;
 
 /**
  * Interface cho file attachment trong email
  */
-export interface EmailAttachment {
+export type TEmailAttachment = {
   filename: string;
   content: Buffer | string; // Buffer cho binary, string cho base64
   contentType?: string;
-}
+};
 
 /**
  * Dữ liệu mẫu để test
  */
-export const sampleLoanDisbursementData: LoanDisbursementData = {
+export const sampleLoanDisbursementData: TLoanDisbursementData = {
   customer_name: "Nguyễn Thành Phong",
   customer_email: "np95085@gmail.com",
   contract_code: "AP261025021",

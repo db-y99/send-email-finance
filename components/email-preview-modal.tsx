@@ -2,22 +2,22 @@
 
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/modal";
 import { Button } from "@heroui/button";
-import { LoanDisbursementData } from "@/types/loan-disbursement";
+import { TLoanDisbursementData } from "@/types/loan-disbursement";
 import { renderEmailHTML, getEmailSubject } from "@/lib/email-template";
 
-interface EmailPreviewModalProps {
+type TEmailPreviewModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  data: LoanDisbursementData | null;
+  data: TLoanDisbursementData | null;
   onSend?: () => void;
-}
+};
 
 export function EmailPreviewModal({
   isOpen,
   onClose,
   data,
   onSend,
-}: EmailPreviewModalProps) {
+}: TEmailPreviewModalProps) {
   if (!data) return null;
 
   // Sử dụng logo từ public folder - trong preview sẽ dùng relative path

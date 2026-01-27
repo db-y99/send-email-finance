@@ -3,10 +3,9 @@
 import { useState, useTransition } from "react";
 import { LoanDisbursementForm } from "@/components/loan-disbursement-form";
 import { EmailPreviewModal } from "@/components/email-preview-modal";
-import { LoanDisbursementData } from "@/types/loan-disbursement";
+import { TLoanDisbursementData, sampleLoanDisbursementData } from "@/types/loan-disbursement";
 import { Button } from "@heroui/button";
 import { title } from "@/components/primitives";
-import { sampleLoanDisbursementData } from "@/types/loan-disbursement";
 
 // Hoist static JSX elements (rule 6.3)
 const LoadingOverlay = (
@@ -18,17 +17,17 @@ const LoadingOverlay = (
 );
 
 export default function DisbursementPage() {
-  const [formData, setFormData] = useState<LoanDisbursementData | null>(null);
+  const [formData, setFormData] = useState<TLoanDisbursementData | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   // Use useTransition instead of manual loading state (rule 6.9)
   const [isPending, startTransition] = useTransition();
 
-  const handlePreview = (data: LoanDisbursementData) => {
+  const handlePreview = (data: TLoanDisbursementData) => {
     setFormData(data);
     setIsPreviewOpen(true);
   };
 
-  const handleSubmit = async (data: LoanDisbursementData) => {
+  const handleSubmit = async (data: TLoanDisbursementData) => {
     startTransition(async () => {
       try {
         // Tạo FormData để gửi cả data và files
@@ -55,22 +54,25 @@ export default function DisbursementPage() {
         // Gọi API để gửi email với FormData
         const response = await fetch("/api/send-email", {
           method: "POST",
-          // Không set Content-Type header, browser sẽ tự động set với boundary cho FormData
           body: formData,
         });
 
-        if (response.ok) {
-          const result = await response.json();
+        const result = await response.json();
+
+        // Xử lý response theo Result pattern
+        if (result.ok) {
           alert(`Email đã được gửi thành công đến ${data.customer_email}`);
           // Reset form sau khi gửi thành công
           window.location.reload();
         } else {
-          const error = await response.json();
-          alert(`Lỗi khi gửi email: ${error.message || "Unknown error"}`);
+          // Hiển thị lỗi từ Result pattern
+          const errorMessage = result.error?.message || "Đã có lỗi xảy ra khi gửi email";
+          alert(`Lỗi: ${errorMessage}`);
+          console.error("Email send error:", result.error);
         }
       } catch (error) {
-        console.error("Error sending email:", error);
-        alert("Đã có lỗi xảy ra khi gửi email. Vui lòng thử lại.");
+        console.error("Critical error sending email:", error);
+        alert("Đã có lỗi hệ thống xảy ra khi gửi email. Vui lòng thử lại.");
       }
     });
   };

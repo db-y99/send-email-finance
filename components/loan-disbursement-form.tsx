@@ -4,33 +4,33 @@ import { useState, useCallback, useRef, FormEvent, useEffect } from "react";
 import { Card, CardHeader, CardBody } from "@heroui/card";
 import { Input } from "@heroui/input";
 import { Button } from "@heroui/button";
-import { LoanDisbursementData } from "@/types/loan-disbursement";
+import { TLoanDisbursementData } from "@/types/loan-disbursement";
 import { EmailRecipientInput } from "./email-recipient-input";
 import { EMAIL_REGEX } from "@/constants/email";
 import { MAX_FILE_SIZE, ACCEPTED_FILE_TYPES } from "@/constants/files";
 import { formatCurrencyInput, parseCurrencyInput } from "@/lib/currency";
 import { parseCCEmailsRaw } from "@/lib/email";
 
-interface LoanDisbursementFormProps {
-  onSubmit: (data: LoanDisbursementData) => void;
-  onPreview: (data: LoanDisbursementData) => void;
-  initialData?: Partial<LoanDisbursementData>;
-}
+type TLoanDisbursementFormProps = {
+  onSubmit: (data: TLoanDisbursementData) => void;
+  onPreview: (data: TLoanDisbursementData) => void;
+  initialData?: Partial<TLoanDisbursementData>;
+};
 
-interface FormErrors {
+type TFormErrors = {
   [key: string]: string | undefined;
-}
+};
 
 /**
  * Hoist validation logic ra ngoài component (rule 5.5, 7.8)
  * Early return pattern để tránh unnecessary computation
  */
 function validateFormData(
-  formData: Partial<LoanDisbursementData>,
+  formData: Partial<TLoanDisbursementData>,
   toEmailsArray: string[],
   ccEmailsArray: string[]
-): FormErrors {
-  const errors: FormErrors = {};
+): TFormErrors {
+  const errors: TFormErrors = {};
 
   // Validate TO emails - early return pattern (rule 7.8)
   if (toEmailsArray.length === 0) {
@@ -105,13 +105,13 @@ export function LoanDisbursementForm({
   onSubmit,
   onPreview,
   initialData,
-}: LoanDisbursementFormProps) {
+}: TLoanDisbursementFormProps) {
   // Lazy state initialization (rule 5.10)
-  const [formData, setFormData] = useState<Partial<LoanDisbursementData>>(() =>
+  const [formData, setFormData] = useState<Partial<TLoanDisbursementData>>(() =>
     initialData || {}
   );
 
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [errors, setErrors] = useState<TFormErrors>({});
   const [toEmailsArray, setToEmailsArray] = useState<string[]>(() => {
     return initialData?.customer_email ? [initialData.customer_email] : [];
   });
@@ -139,7 +139,7 @@ export function LoanDisbursementForm({
   // Update field helper - functional setState (rule 5.9)
   // Không cần errors dependency vì dùng functional update
   const updateField = useCallback(
-    (field: keyof LoanDisbursementData, value: string | number) => {
+    (field: keyof TLoanDisbursementData, value: string | number) => {
       setFormData((prev) => ({ ...prev, [field]: value }));
       // Clear error when user types - functional setState
       setErrors((prev) => {
@@ -189,7 +189,7 @@ export function LoanDisbursementForm({
 
   // Helper để build submit data - hoisted logic
   const buildSubmitData = useCallback(
-    (): LoanDisbursementData => {
+    (): TLoanDisbursementData => {
       const toEmail = toEmailsArray[0] || "";
       const ccEmailsString =
         ccEmailsArray.length > 0 ? ccEmailsArray.join(", ") : undefined;
@@ -199,7 +199,7 @@ export function LoanDisbursementForm({
         customer_email: toEmail,
         cc_emails: ccEmailsString,
         attachments: attachments.length > 0 ? attachments : undefined,
-      } as LoanDisbursementData;
+      } as TLoanDisbursementData;
     },
     [formData, toEmailsArray, ccEmailsArray, attachments]
   );

@@ -1,4 +1,4 @@
-export type SiteConfig = typeof siteConfig;
+export type TSiteConfig = typeof siteConfig;
 
 export const siteConfig = {
   name: "Next.js + HeroUI",
