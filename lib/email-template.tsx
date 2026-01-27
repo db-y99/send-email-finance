@@ -4,6 +4,7 @@
  */
 
 import { LoanDisbursementData } from "@/types/loan-disbursement";
+import { formatCurrency } from "./currency";
 
 /**
  * Chuyển đổi số thành chữ tiếng Việt
@@ -87,13 +88,6 @@ function numberToVietnameseWords(num: number): string {
     return result;
   }
   return num.toString();
-}
-
-/**
- * Format số tiền VNĐ
- */
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("vi-VN").format(amount);
 }
 
 /**

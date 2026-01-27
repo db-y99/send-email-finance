@@ -2,20 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { LoanDisbursementData } from "@/types/loan-disbursement";
 import { renderEmailHTML, getEmailSubject } from "@/lib/email-template";
-
-// Hoist RegExp to module scope (rule 7.9)
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/**
- * Parse và validate CC emails từ string (comma-separated)
- */
-function parseCCEmails(ccEmails?: string): string[] {
-  if (!ccEmails?.trim()) return [];
-  return ccEmails
-    .split(",")
-    .map((email) => email.trim())
-    .filter((email) => email && EMAIL_REGEX.test(email));
-}
+import { EMAIL_REGEX } from "@/constants/email";
+import { parseCCEmails } from "@/lib/email";
 
 /**
  * API Route để gửi email thông báo giải ngân

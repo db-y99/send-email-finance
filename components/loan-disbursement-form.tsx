@@ -4,12 +4,12 @@ import { useState, useCallback, useRef, FormEvent, useEffect } from "react";
 import { Card, CardHeader, CardBody } from "@heroui/card";
 import { Input } from "@heroui/input";
 import { Button } from "@heroui/button";
-import { Divider } from "@heroui/divider";
 import { LoanDisbursementData } from "@/types/loan-disbursement";
 import { EmailRecipientInput } from "./email-recipient-input";
-
-// Hoist RegExp to module scope (rule 7.9)
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { EMAIL_REGEX } from "@/constants/email";
+import { MAX_FILE_SIZE, ACCEPTED_FILE_TYPES } from "@/constants/files";
+import { formatCurrencyInput, parseCurrencyInput } from "@/lib/currency";
+import { parseCCEmailsRaw } from "@/lib/email";
 
 interface LoanDisbursementFormProps {
   onSubmit: (data: LoanDisbursementData) => void;
@@ -21,12 +21,92 @@ interface FormErrors {
   [key: string]: string | undefined;
 }
 
+/**
+ * Hoist validation logic ra ngoài component (rule 5.5, 7.8)
+ * Early return pattern để tránh unnecessary computation
+ */
+function validateFormData(
+  formData: Partial<LoanDisbursementData>,
+  toEmailsArray: string[],
+  ccEmailsArray: string[]
+): FormErrors {
+  const errors: FormErrors = {};
+
+  // Validate TO emails - early return pattern (rule 7.8)
+  if (toEmailsArray.length === 0) {
+    errors.customer_email = "Vui lòng nhập ít nhất một email TO";
+  } else {
+    const invalidEmails = toEmailsArray.filter(
+      (email) => !EMAIL_REGEX.test(email)
+    );
+    if (invalidEmails.length > 0) {
+      errors.customer_email = "Email TO không hợp lệ";
+    }
+  }
+
+  // Validate CC emails - optional but must be valid if provided
+  if (ccEmailsArray.length > 0) {
+    const invalidCCEmails = ccEmailsArray.filter(
+      (email) => !EMAIL_REGEX.test(email)
+    );
+    if (invalidCCEmails.length > 0) {
+      errors.cc_emails = "Một hoặc nhiều email CC không hợp lệ";
+    }
+  }
+
+  // Required fields validation - early return pattern
+  if (!formData.customer_name?.trim()) {
+    errors.customer_name = "Vui lòng nhập họ và tên khách hàng";
+  }
+  if (!formData.contract_code?.trim()) {
+    errors.contract_code = "Vui lòng nhập số hợp đồng";
+  }
+  if (!formData.disbursement_amount || formData.disbursement_amount <= 0) {
+    errors.disbursement_amount = "Vui lòng nhập số tiền giải ngân hợp lệ";
+  }
+  if (!formData.disbursement_date) {
+    errors.disbursement_date = "Vui lòng chọn ngày giải ngân";
+  }
+  if (!formData.total_loan_amount || formData.total_loan_amount <= 0) {
+    errors.total_loan_amount = "Vui lòng nhập tổng số vốn vay hợp lệ";
+  }
+  if (!formData.loan_term_months || formData.loan_term_months <= 0) {
+    errors.loan_term_months = "Vui lòng nhập thời hạn vay hợp lệ";
+  }
+  if (!formData.loan_start_date) {
+    errors.loan_start_date = "Vui lòng chọn ngày bắt đầu vay";
+  }
+  if (!formData.loan_end_date) {
+    errors.loan_end_date = "Vui lòng chọn ngày kết thúc vay";
+  }
+  if (
+    !formData.due_day_each_month ||
+    formData.due_day_each_month < 1 ||
+    formData.due_day_each_month > 31
+  ) {
+    errors.due_day_each_month =
+      "Vui lòng nhập ngày đến hạn hàng tháng (1-31)";
+  }
+  if (!formData.bank_name?.trim()) {
+    errors.bank_name = "Vui lòng nhập tên ngân hàng";
+  }
+  if (!formData.bank_account_number?.trim()) {
+    errors.bank_account_number = "Vui lòng nhập số tài khoản";
+  }
+  if (!formData.beneficiary_name?.trim()) {
+    errors.beneficiary_name = "Vui lòng nhập tên người thụ hưởng";
+  }
+
+  return errors;
+}
+
+
 export function LoanDisbursementForm({
   onSubmit,
   onPreview,
   initialData,
 }: LoanDisbursementFormProps) {
-  // Lazy state initialization (rule 5.5)
+  // Lazy state initialization (rule 5.10)
   const [formData, setFormData] = useState<Partial<LoanDisbursementData>>(() =>
     initialData || {}
   );
@@ -37,7 +117,7 @@ export function LoanDisbursementForm({
   });
   const [ccEmailsArray, setCcEmailsArray] = useState<string[]>(() => {
     return initialData?.cc_emails
-      ? initialData.cc_emails.split(",").map((e) => e.trim()).filter(Boolean)
+      ? parseCCEmailsRaw(initialData.cc_emails)
       : [];
   });
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -51,26 +131,30 @@ export function LoanDisbursementForm({
         setToEmailsArray([initialData.customer_email]);
       }
       if (initialData.cc_emails) {
-        setCcEmailsArray(
-          initialData.cc_emails.split(",").map((e) => e.trim()).filter(Boolean)
-        );
+        setCcEmailsArray(parseCCEmailsRaw(initialData.cc_emails));
       }
     }
   }, [initialData]);
 
-  // Update field helper
+  // Update field helper - functional setState (rule 5.9)
+  // Không cần errors dependency vì dùng functional update
   const updateField = useCallback(
     (field: keyof LoanDisbursementData, value: string | number) => {
       setFormData((prev) => ({ ...prev, [field]: value }));
-      // Clear error when user types
-      if (errors[field]) {
-        setErrors((prev) => ({ ...prev, [field]: undefined }));
-      }
+      // Clear error when user types - functional setState
+      setErrors((prev) => {
+        if (prev[field]) {
+          const newErrors = { ...prev };
+          delete newErrors[field];
+          return newErrors;
+        }
+        return prev;
+      });
     },
-    [errors]
+    [] // No dependencies needed với functional setState
   );
 
-  // Handle file change
+  // Handle file change - functional setState (rule 5.9)
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(e.target.files || []);
@@ -78,144 +162,64 @@ export function LoanDisbursementForm({
 
       files.forEach((file) => {
         // Validate file size (max 10MB)
-        if (file.size > 10 * 1024 * 1024) {
+        if (file.size > MAX_FILE_SIZE) {
           alert(`File ${file.name} quá lớn. Kích thước tối đa là 10MB.`);
           return;
         }
         validFiles.push(file);
       });
 
+      // Functional setState update
       setAttachments((prev) => [...prev, ...validFiles]);
     },
     []
   );
 
-  // Remove attachment
+  // Remove attachment - functional setState (rule 5.9)
   const removeAttachment = useCallback((index: number) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  // Validation
+  // Validation - hoisted function, no dependencies needed
   const validate = useCallback((): boolean => {
-    const newErrors: FormErrors = {};
-
-    // Validate TO emails - must have at least one valid email
-    if (toEmailsArray.length === 0) {
-      newErrors.customer_email = "Vui lòng nhập ít nhất một email TO";
-    } else {
-      const invalidEmails = toEmailsArray.filter(
-        (email) => !EMAIL_REGEX.test(email)
-      );
-      if (invalidEmails.length > 0) {
-        newErrors.customer_email = "Email TO không hợp lệ";
-      }
-    }
-
-    // Validate CC emails - optional but must be valid if provided
-    if (ccEmailsArray.length > 0) {
-      const invalidCCEmails = ccEmailsArray.filter(
-        (email) => !EMAIL_REGEX.test(email)
-      );
-      if (invalidCCEmails.length > 0) {
-        newErrors.cc_emails = "Một hoặc nhiều email CC không hợp lệ";
-      }
-    }
-
-    // Required fields
-    if (!formData.customer_name?.trim()) {
-      newErrors.customer_name = "Vui lòng nhập họ và tên khách hàng";
-    }
-    if (!formData.contract_code?.trim()) {
-      newErrors.contract_code = "Vui lòng nhập số hợp đồng";
-    }
-    if (!formData.disbursement_amount || formData.disbursement_amount <= 0) {
-      newErrors.disbursement_amount = "Vui lòng nhập số tiền giải ngân hợp lệ";
-    }
-    if (!formData.disbursement_date) {
-      newErrors.disbursement_date = "Vui lòng chọn ngày giải ngân";
-    }
-    if (!formData.total_loan_amount || formData.total_loan_amount <= 0) {
-      newErrors.total_loan_amount = "Vui lòng nhập tổng số vốn vay hợp lệ";
-    }
-    if (!formData.loan_term_months || formData.loan_term_months <= 0) {
-      newErrors.loan_term_months = "Vui lòng nhập thời hạn vay hợp lệ";
-    }
-    if (!formData.loan_start_date) {
-      newErrors.loan_start_date = "Vui lòng chọn ngày bắt đầu vay";
-    }
-    if (!formData.loan_end_date) {
-      newErrors.loan_end_date = "Vui lòng chọn ngày kết thúc vay";
-    }
-    if (
-      !formData.due_day_each_month ||
-      formData.due_day_each_month < 1 ||
-      formData.due_day_each_month > 31
-    ) {
-      newErrors.due_day_each_month =
-        "Vui lòng nhập ngày đến hạn hàng tháng (1-31)";
-    }
-    if (!formData.bank_name?.trim()) {
-      newErrors.bank_name = "Vui lòng nhập tên ngân hàng";
-    }
-    if (!formData.bank_account_number?.trim()) {
-      newErrors.bank_account_number = "Vui lòng nhập số tài khoản";
-    }
-    if (!formData.beneficiary_name?.trim()) {
-      newErrors.beneficiary_name = "Vui lòng nhập tên người thụ hưởng";
-    }
-
+    const newErrors = validateFormData(formData, toEmailsArray, ccEmailsArray);
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }, [formData, toEmailsArray, ccEmailsArray]);
 
-  // Handle submit
-  const handleSubmit = useCallback(
-    (e: FormEvent<HTMLFormElement>) => {
-      e.preventDefault();
-      if (!validate()) return;
-
-      // Convert email arrays to form data format
+  // Helper để build submit data - hoisted logic
+  const buildSubmitData = useCallback(
+    (): LoanDisbursementData => {
       const toEmail = toEmailsArray[0] || "";
       const ccEmailsString =
         ccEmailsArray.length > 0 ? ccEmailsArray.join(", ") : undefined;
 
-      const submitData: LoanDisbursementData = {
+      return {
         ...formData,
         customer_email: toEmail,
         cc_emails: ccEmailsString,
         attachments: attachments.length > 0 ? attachments : undefined,
       } as LoanDisbursementData;
-
-      onSubmit(submitData);
     },
-    [formData, toEmailsArray, ccEmailsArray, attachments, validate, onSubmit]
+    [formData, toEmailsArray, ccEmailsArray, attachments]
   );
 
-  // Handle preview
+  // Handle submit - functional setState pattern (rule 5.9)
+  const handleSubmit = useCallback(
+    (e: FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      if (!validate()) return;
+
+      onSubmit(buildSubmitData());
+    },
+    [validate, buildSubmitData, onSubmit]
+  );
+
+  // Handle preview - functional setState pattern (rule 5.9)
   const handlePreview = useCallback(() => {
     if (!validate()) return;
-
-    // Convert email arrays to form data format
-    const toEmail = toEmailsArray[0] || "";
-    const ccEmailsString =
-      ccEmailsArray.length > 0 ? ccEmailsArray.join(", ") : undefined;
-
-    const previewData: LoanDisbursementData = {
-      ...formData,
-      customer_email: toEmail,
-      cc_emails: ccEmailsString,
-      attachments: attachments.length > 0 ? attachments : undefined,
-    } as LoanDisbursementData;
-
-    onPreview(previewData);
-  }, [
-    formData,
-    toEmailsArray,
-    ccEmailsArray,
-    attachments,
-    validate,
-    onPreview,
-  ]);
+    onPreview(buildSubmitData());
+  }, [validate, buildSubmitData, onPreview]);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -236,7 +240,7 @@ export function LoanDisbursementForm({
           <EmailRecipientInput
             label="Email khách hàng (TO)"
             value={toEmailsArray}
-            onChange={(emails: string[]) => setToEmailsArray(emails)}
+            onChange={setToEmailsArray}
             isInvalid={!!errors.customer_email}
             errorMessage={errors.customer_email}
             isRequired
@@ -246,7 +250,7 @@ export function LoanDisbursementForm({
           <EmailRecipientInput
             label="CC (Tùy chọn)"
             value={ccEmailsArray}
-            onChange={(emails: string[]) => setCcEmailsArray(emails)}
+            onChange={setCcEmailsArray}
             isInvalid={!!errors.cc_emails}
             errorMessage={errors.cc_emails}
             description="Nhập email và nhấn Enter để thêm. Có thể paste nhiều email cách nhau bởi dấu phẩy."
@@ -272,11 +276,12 @@ export function LoanDisbursementForm({
         <CardBody className="space-y-4">
           <Input
             label="Số tiền giải ngân (VNĐ)"
-            type="number"
-            value={formData.disbursement_amount?.toString() || ""}
-            onChange={(e) =>
-              updateField("disbursement_amount", parseFloat(e.target.value) || 0)
-            }
+            type="text"
+            value={formatCurrencyInput(formData.disbursement_amount)}
+            onChange={(e) => {
+              const parsed = parseCurrencyInput(e.target.value);
+              updateField("disbursement_amount", parsed);
+            }}
             isInvalid={!!errors.disbursement_amount}
             errorMessage={errors.disbursement_amount}
             isRequired
@@ -301,11 +306,12 @@ export function LoanDisbursementForm({
         <CardBody className="space-y-4">
           <Input
             label="Tổng số vốn vay (VNĐ)"
-            type="number"
-            value={formData.total_loan_amount?.toString() || ""}
-            onChange={(e) =>
-              updateField("total_loan_amount", parseFloat(e.target.value) || 0)
-            }
+            type="text"
+            value={formatCurrencyInput(formData.total_loan_amount)}
+            onChange={(e) => {
+              const parsed = parseCurrencyInput(e.target.value);
+              updateField("total_loan_amount", parsed);
+            }}
             isInvalid={!!errors.total_loan_amount}
             errorMessage={errors.total_loan_amount}
             isRequired
@@ -404,7 +410,7 @@ export function LoanDisbursementForm({
               multiple
               onChange={handleFileChange}
               className="hidden"
-              accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+              accept={ACCEPTED_FILE_TYPES}
             />
             <Button
               type="button"
@@ -414,11 +420,11 @@ export function LoanDisbursementForm({
               Chọn file đính kèm
             </Button>
             <p className="text-xs text-default-500 mt-2">
-              Kích thước tối đa mỗi file: 10MB. Định dạng hỗ trợ: PDF, DOC, DOCX,
-              XLS, XLSX, JPG, PNG
+              Kích thước tối đa mỗi file: 10MB. Định dạng hỗ trợ: PDF, DOC,
+              DOCX, XLS, XLSX, JPG, PNG
             </p>
           </div>
-          {attachments.length > 0 && (
+          {attachments.length > 0 ? (
             <div className="space-y-2">
               <p className="text-sm font-medium">Các file đã chọn:</p>
               <ul className="space-y-1">
@@ -443,7 +449,7 @@ export function LoanDisbursementForm({
                 ))}
               </ul>
             </div>
-          )}
+          ) : null}
         </CardBody>
       </Card>
 
