@@ -10,3 +10,9 @@
     --font-sans: "font", sans-serif;
     --font-mono: "monospace", monospace;
 }
+
+/* scrollbar hidden */
+::-webkit-scrollbar {
+    display: none;
+}
+
