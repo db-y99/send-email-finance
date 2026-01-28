@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { LoanDisbursementSchema } from "@/types/loan-disbursement";
-import { renderEmailHTML, getEmailSubject } from "@/lib/email-template";
+import { getEmailSubject } from "@/lib/email-template";
+import { sendLoanDisbursementEmail } from "@/lib/email-sender";
 import { parseCCEmails } from "@/lib/email";
 import { createError } from "@/lib/errors";
 
@@ -74,20 +75,23 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // 4. Render email content
-    const emailHTML = renderEmailHTML(validatedData);
-    const subject = getEmailSubject(validatedData.contract_code);
+    // 4. Render email content - Move to service layer if possible, or keep here for preview
+    // In this case, service layer handles it.
 
-    // 5. Gửi email (Mock delay)
-    // Trong thực tế, đây sẽ là một service function trả về Result
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    // 5. Gửi email sử dụng Resend Service
+    const emailResult = await sendLoanDisbursementEmail(validatedData);
+
+    if (!emailResult.ok) {
+      return NextResponse.json({ ok: false, error: emailResult.error }, { status: 500 });
+    }
 
     // 6. Logging không chặn response (Rule 3.7 in project-rules.mdc)
     after(async () => {
       console.log("=== EMAIL SEND SUCCESS ===");
+      console.log("ID:", emailResult.data.id);
       console.log("To:", validatedData.customer_email);
       if (ccEmails.length > 0) console.log("CC:", ccEmails.join(", "));
-      console.log("Subject:", subject);
+      console.log("Subject:", getEmailSubject(validatedData.contract_code));
       console.log("==========================");
     });
 
@@ -95,8 +99,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       data: {
+        id: emailResult.data.id,
         to: validatedData.customer_email,
-        subject: subject,
         sentAt: new Date().toISOString(),
       },
     });

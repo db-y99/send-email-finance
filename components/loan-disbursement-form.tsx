@@ -4,6 +4,8 @@ import { useState, useCallback, useRef, FormEvent, useEffect } from "react";
 import { Card, CardHeader, CardBody } from "@heroui/card";
 import { Input } from "@heroui/input";
 import { Button } from "@heroui/button";
+import { DatePicker } from "@heroui/date-picker";
+import { parseDate, today, getLocalTimeZone } from "@internationalized/date";
 import { TLoanDisbursementData } from "@/types/loan-disbursement";
 import { EmailRecipientInput } from "./email-recipient-input";
 import { EMAIL_REGEX } from "@/constants/email";
@@ -20,6 +22,13 @@ type TLoanDisbursementFormProps = {
 type TFormErrors = {
   [key: string]: string | undefined;
 };
+
+/**
+ * Helper function: Get today's date as ISO string (yyyy-MM-dd)
+ */
+function getTodayDateString(): string {
+  return today(getLocalTimeZone()).toString();
+}
 
 /**
  * Hoist validation logic ra ngoài component (rule 5.5, 7.8)
@@ -107,9 +116,16 @@ export function LoanDisbursementForm({
   initialData,
 }: TLoanDisbursementFormProps) {
   // Lazy state initialization (rule 5.10)
-  const [formData, setFormData] = useState<Partial<TLoanDisbursementData>>(() =>
-    initialData || {}
-  );
+  // Set default date values to today if not provided
+  const [formData, setFormData] = useState<Partial<TLoanDisbursementData>>(() => {
+    const todayStr = getTodayDateString();
+    return {
+      disbursement_date: todayStr,
+      loan_start_date: todayStr,
+      loan_end_date: todayStr,
+      ...initialData, // initialData will override defaults if provided
+    };
+  });
 
   const [errors, setErrors] = useState<TFormErrors>({});
   const [toEmailsArray, setToEmailsArray] = useState<string[]>(() => {
@@ -286,14 +302,15 @@ export function LoanDisbursementForm({
             errorMessage={errors.disbursement_amount}
             isRequired
           />
-          <Input
+          <DatePicker
             label="Ngày giải ngân"
-            type="date"
-            value={formData.disbursement_date || ""}
-            onChange={(e) => updateField("disbursement_date", e.target.value)}
+            className="max-w-full"
+            value={formData.disbursement_date ? parseDate(formData.disbursement_date) : null}
+            onChange={(date) => updateField("disbursement_date", date ? date.toString() : "")}
             isInvalid={!!errors.disbursement_date}
             errorMessage={errors.disbursement_date}
             isRequired
+            showMonthAndYearPickers
           />
         </CardBody>
       </Card>
@@ -328,23 +345,23 @@ export function LoanDisbursementForm({
             isRequired
           />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
+            <DatePicker
               label="Ngày bắt đầu vay"
-              type="date"
-              value={formData.loan_start_date || ""}
-              onChange={(e) => updateField("loan_start_date", e.target.value)}
+              value={formData.loan_start_date ? parseDate(formData.loan_start_date) : null}
+              onChange={(date) => updateField("loan_start_date", date ? date.toString() : "")}
               isInvalid={!!errors.loan_start_date}
               errorMessage={errors.loan_start_date}
               isRequired
+              showMonthAndYearPickers
             />
-            <Input
+            <DatePicker
               label="Ngày kết thúc vay"
-              type="date"
-              value={formData.loan_end_date || ""}
-              onChange={(e) => updateField("loan_end_date", e.target.value)}
+              value={formData.loan_end_date ? parseDate(formData.loan_end_date) : null}
+              onChange={(date) => updateField("loan_end_date", date ? date.toString() : "")}
               isInvalid={!!errors.loan_end_date}
               errorMessage={errors.loan_end_date}
               isRequired
+              showMonthAndYearPickers
             />
           </div>
           <Input

@@ -12,29 +12,34 @@ export const createError = {
     statusCode: 400,
     details,
   }),
-  notFound: (message: string): AppErrorObject => ({
+  notFound: (message: string, details?: unknown): AppErrorObject => ({
     code: ERROR_CODES.NOT_FOUND,
     message,
     statusCode: 404,
+    details,
   }),
-  database: (message: string): AppErrorObject => ({
+  database: (message: string, details?: unknown): AppErrorObject => ({
     code: ERROR_CODES.DATABASE,
     message,
     statusCode: 500,
+    details,
   }),
-  unauthorized: (message = "Unauthorized"): AppErrorObject => ({
+  unauthorized: (message = "Unauthorized", details?: unknown): AppErrorObject => ({
     code: ERROR_CODES.UNAUTHORIZED,
     message,
     statusCode: 401,
+    details,
   }),
-  server: (message: string): AppErrorObject => ({
+  server: (message: string, details?: unknown): AppErrorObject => ({
     code: ERROR_CODES.SERVER_ERROR,
     message,
     statusCode: 500,
+    details,
   }),
-  email: (message: string): AppErrorObject => ({
+  email: (message: string, details?: unknown): AppErrorObject => ({
     code: ERROR_CODES.EMAIL_SEND_FAILED,
     message,
     statusCode: 500,
+    details,
   }),
 };

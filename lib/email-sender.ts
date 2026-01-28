@@ -1,221 +1,78 @@
 /**
- * Utility functions và pseudocode cho việc gửi email
- * 
- * File này mô tả cách tích hợp SMTP thật vào hệ thống
+ * Email sender service using Resend API (via fetch)
  */
 
 import { TLoanDisbursementData } from "@/types/loan-disbursement";
 import { renderEmailHTML, getEmailSubject } from "./email-template";
+import { Result, ok, err } from "@/types/result.types";
+import { createError } from "./errors";
+import { env } from "@/config/env";
+import { parseCCEmails } from "./email";
 
 /**
- * Interface cho email service
+ * Result type for email sending
  */
-export interface EmailService {
-  sendEmail(data: TLoanDisbursementData): Promise<EmailSendResult>;
+export type EmailSendResponse = {
+  id: string;
+};
+
+/**
+ * Gửi email thông báo giải ngân sử dụng Resend API (via fetch)
+ * @param data - Dữ liệu giải ngân đã được validate
+ * @returns Result với ID của email đã gửi hoặc AppErrorObject
+ */
+export async function sendLoanDisbursementEmail(
+  data: TLoanDisbursementData
+): Promise<Result<EmailSendResponse>> {
+  try {
+    const emailHTML = renderEmailHTML(data);
+    const subject = getEmailSubject(data.contract_code);
+    const ccEmails = parseCCEmails(data.cc_emails);
+
+    // Resend API payload
+    const payload = {
+      from: env.FROM_EMAIL,
+      to: data.customer_email,
+      cc: ccEmails.length > 0 ? ccEmails : undefined,
+      subject: subject,
+      html: emailHTML,
+    };
+
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error("Resend API error:", result);
+      return err(
+        createError.email(
+          `Resend API error: ${result.message || response.statusText}`,
+          result
+        )
+      );
+    }
+
+    return ok({ id: result.id });
+  } catch (error) {
+    console.error("Critical error in sendLoanDisbursementEmail:", error);
+    return err(
+      createError.email(
+        error instanceof Error ? error.message : "Failed to send email"
+      )
+    );
+  }
 }
 
-export interface EmailSendResult {
-  success: boolean;
-  messageId?: string;
-  error?: string;
-}
-
 /**
- * Pseudocode: Cách tích hợp với Nodemailer
- * 
- * 1. Cài đặt package:
- *    npm install nodemailer
- *    npm install --save-dev @types/nodemailer
- * 
- * 2. Tạo transporter:
- * 
- * import nodemailer from 'nodemailer';
- * 
- * const transporter = nodemailer.createTransport({
- *   host: process.env.SMTP_HOST, // VD: 'smtp.gmail.com'
- *   port: parseInt(process.env.SMTP_PORT || '587'),
- *   secure: false, // true cho port 465, false cho các port khác
- *   auth: {
- *     user: process.env.SMTP_USER,
- *     pass: process.env.SMTP_PASSWORD, // Hoặc app password cho Gmail
- *   },
- * });
- * 
- * 3. Gửi email:
- * 
- * async function sendEmail(data: TLoanDisbursementData): Promise<EmailSendResult> {
- *   try {
- *     const emailHTML = renderEmailHTML(data);
- *     const subject = getEmailSubject(data.contract_code);
- * 
- *     const info = await transporter.sendMail({
- *       from: process.env.FROM_EMAIL || 'finance@y99.vn',
- *       to: data.customer_email,
- *       subject: subject,
- *       html: emailHTML,
- *       // Có thể thêm reply-to nếu cần
- *       replyTo: 'cskh@y99.vn',
- *     });
- * 
- *     return {
- *       success: true,
- *       messageId: info.messageId,
- *     };
- *   } catch (error) {
- *     return {
- *       success: false,
- *       error: error instanceof Error ? error.message : 'Unknown error',
- *     };
- *   }
- * }
- */
-
-/**
- * Pseudocode: Cách tích hợp với SendGrid
- * 
- * 1. Cài đặt package:
- *    npm install @sendgrid/mail
- * 
- * 2. Setup:
- * 
- * import sgMail from '@sendgrid/mail';
- * sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
- * 
- * 3. Gửi email:
- * 
- * async function sendEmailWithSendGrid(data: TLoanDisbursementData): Promise<EmailSendResult> {
- *   try {
- *     const emailHTML = renderEmailHTML(data);
- *     const subject = getEmailSubject(data.contract_code);
- * 
- *     const msg = {
- *       to: data.customer_email,
- *       from: process.env.FROM_EMAIL || 'finance@y99.vn',
- *       subject: subject,
- *       html: emailHTML,
- *     };
- * 
- *     const [response] = await sgMail.send(msg);
- * 
- *     return {
- *       success: true,
- *       messageId: response.headers['x-message-id'],
- *     };
- *   } catch (error) {
- *     return {
- *       success: false,
- *       error: error instanceof Error ? error.message : 'Unknown error',
- *     };
- *   }
- * }
- */
-
-/**
- * Pseudocode: Cách tích hợp với AWS SES
- * 
- * 1. Cài đặt package:
- *    npm install @aws-sdk/client-ses
- * 
- * 2. Setup:
- * 
- * import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
- * 
- * const sesClient = new SESClient({
- *   region: process.env.AWS_REGION || 'us-east-1',
- *   credentials: {
- *     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
- *     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
- *   },
- * });
- * 
- * 3. Gửi email:
- * 
- * async function sendEmailWithSES(data: TLoanDisbursementData): Promise<EmailSendResult> {
- *   try {
- *     const emailHTML = renderEmailHTML(data);
- *     const subject = getEmailSubject(data.contract_code);
- * 
- *     const command = new SendEmailCommand({
- *       Source: process.env.FROM_EMAIL || 'finance@y99.vn',
- *       Destination: {
- *         ToAddresses: [data.customer_email],
- *       },
- *       Message: {
- *         Subject: {
- *           Data: subject,
- *           Charset: 'UTF-8',
- *         },
- *         Body: {
- *           Html: {
- *             Data: emailHTML,
- *             Charset: 'UTF-8',
- *           },
- *         },
- *       },
- *     });
- * 
- *     const response = await sesClient.send(command);
- * 
- *     return {
- *       success: true,
- *       messageId: response.MessageId,
- *     };
- *   } catch (error) {
- *     return {
- *       success: false,
- *       error: error instanceof Error ? error.message : 'Unknown error',
- *     };
- *   }
- * }
- */
-
-/**
- * Pseudocode: Cách tích hợp với Resend (modern email API)
- * 
- * 1. Cài đặt package:
- *    npm install resend
- * 
- * 2. Setup:
- * 
- * import { Resend } from 'resend';
- * const resend = new Resend(process.env.RESEND_API_KEY);
- * 
- * 3. Gửi email:
- * 
- * async function sendEmailWithResend(data: TLoanDisbursementData): Promise<EmailSendResult> {
- *   try {
- *     const emailHTML = renderEmailHTML(data);
- *     const subject = getEmailSubject(data.contract_code);
- * 
- *     const { data: result, error } = await resend.emails.send({
- *       from: process.env.FROM_EMAIL || 'finance@y99.vn',
- *       to: data.customer_email,
- *       subject: subject,
- *       html: emailHTML,
- *     });
- * 
- *     if (error) {
- *       return {
- *         success: false,
- *         error: error.message,
- *       };
- *     }
- * 
- *     return {
- *       success: true,
- *       messageId: result?.id,
- *     };
- *   } catch (error) {
- *     return {
- *       success: false,
- *       error: error instanceof Error ? error.message : 'Unknown error',
- *     };
- *   }
- * }
- */
-
-/**
- * Helper function để validate email trước khi gửi
+ * Helper function để validate email trước khi gửi (Legacy - maintained for compatibility if needed)
+ * @deprecated Use Zod schema instead
  */
 export function validateEmailData(data: TLoanDisbursementData): {
   valid: boolean;
