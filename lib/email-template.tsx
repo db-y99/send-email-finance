@@ -272,7 +272,7 @@ export function renderEmailHTML(
 
         <div class="content">
             <div class="announcement">
-                DOANH NGHIỆP TƯ NHÂN Y99 xin trân trọng thông báo: khoản vay của Ông/Bà theo Hợp đồng số <strong>${data.contract_code}</strong> đã được giải ngân thành công.
+                CÔNG TY CỔ PHẦN CẦM ĐỒ Y99 xin trân trọng thông báo: khoản vay của Ông/Bà theo Hợp đồng số <strong>${data.contract_code}</strong> đã được giải ngân thành công.
             </div>
 
             <div class="section-title">Chi tiết giao dịch giải ngân như sau:</div>
