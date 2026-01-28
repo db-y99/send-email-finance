@@ -32,7 +32,7 @@ export default function DisbursementPage() {
       try {
         // Tạo FormData để gửi cả data và files
         const formData = new FormData();
-        
+
         // Thêm các field text vào FormData
         Object.entries(data).forEach(([key, value]) => {
           if (key !== "attachments" && value !== undefined) {
@@ -89,6 +89,11 @@ export default function DisbursementPage() {
     setIsPreviewOpen(true);
   };
 
+  const handleReset = () => {
+    setFormData(null);
+    setIsPreviewOpen(false);
+  };
+
   return (
     <div className="max-w-4xl mx-auto py-8">
       <div className="mb-8">
@@ -111,6 +116,7 @@ export default function DisbursementPage() {
       <LoanDisbursementForm
         onSubmit={handleSubmit}
         onPreview={handlePreview}
+        onReset={handleReset}
         initialData={formData || undefined}
       />
 

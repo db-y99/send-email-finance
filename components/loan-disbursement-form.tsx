@@ -16,6 +16,7 @@ import { parseCCEmailsRaw } from "@/lib/email";
 type TLoanDisbursementFormProps = {
   onSubmit: (data: TLoanDisbursementData) => void;
   onPreview: (data: TLoanDisbursementData) => void;
+  onReset?: () => void;
   initialData?: Partial<TLoanDisbursementData>;
 };
 
@@ -28,6 +29,19 @@ type TFormErrors = {
  */
 function getTodayDateString(): string {
   return today(getLocalTimeZone()).toString();
+}
+
+/**
+ * Safe parse date function - returns null if parsing fails
+ * Prevents DatePicker rendering errors
+ */
+function safeParseDateOrNull(dateStr: string | undefined) {
+  if (!dateStr) return null;
+  try {
+    return parseDate(dateStr);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -113,6 +127,7 @@ function validateFormData(
 export function LoanDisbursementForm({
   onSubmit,
   onPreview,
+  onReset,
   initialData,
 }: TLoanDisbursementFormProps) {
   // Lazy state initialization (rule 5.10)
@@ -237,6 +252,25 @@ export function LoanDisbursementForm({
     onPreview(buildSubmitData());
   }, [validate, buildSubmitData, onPreview]);
 
+  // Handle reset - reset form to initial state with today's dates
+  const handleResetForm = useCallback(() => {
+    const todayStr = getTodayDateString();
+    setFormData({
+      disbursement_date: todayStr,
+      loan_start_date: todayStr,
+      loan_end_date: todayStr,
+    });
+    setToEmailsArray([]);
+    setCcEmailsArray([]);
+    setAttachments([]);
+    setErrors({});
+    
+    // Call parent onReset if provided
+    if (onReset) {
+      onReset();
+    }
+  }, [onReset]);
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Thông tin khách hàng */}
@@ -305,7 +339,7 @@ export function LoanDisbursementForm({
           <DatePicker
             label="Ngày giải ngân"
             className="max-w-full"
-            value={formData.disbursement_date ? parseDate(formData.disbursement_date) : null}
+            value={safeParseDateOrNull(formData.disbursement_date)}
             onChange={(date) => updateField("disbursement_date", date ? date.toString() : "")}
             isInvalid={!!errors.disbursement_date}
             errorMessage={errors.disbursement_date}
@@ -347,7 +381,7 @@ export function LoanDisbursementForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <DatePicker
               label="Ngày bắt đầu vay"
-              value={formData.loan_start_date ? parseDate(formData.loan_start_date) : null}
+              value={safeParseDateOrNull(formData.loan_start_date)}
               onChange={(date) => updateField("loan_start_date", date ? date.toString() : "")}
               isInvalid={!!errors.loan_start_date}
               errorMessage={errors.loan_start_date}
@@ -356,7 +390,7 @@ export function LoanDisbursementForm({
             />
             <DatePicker
               label="Ngày kết thúc vay"
-              value={formData.loan_end_date ? parseDate(formData.loan_end_date) : null}
+              value={safeParseDateOrNull(formData.loan_end_date)}
               onChange={(date) => updateField("loan_end_date", date ? date.toString() : "")}
               isInvalid={!!errors.loan_end_date}
               errorMessage={errors.loan_end_date}
@@ -474,6 +508,9 @@ export function LoanDisbursementForm({
       <div className="flex gap-4 justify-end">
         <Button type="button" variant="bordered" onPress={handlePreview}>
           Xem trước email
+        </Button>
+        <Button type="button" variant="flat" color="warning" onPress={handleResetForm}>
+          Reset data
         </Button>
         <Button type="submit" color="primary">
           Gửi email
