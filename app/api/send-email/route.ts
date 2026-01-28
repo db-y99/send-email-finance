@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
-import { TLoanDisbursementData, LoanDisbursementSchema } from "@/types/loan-disbursement";
+import { LoanDisbursementSchema } from "@/types/loan-disbursement";
 import { renderEmailHTML, getEmailSubject } from "@/lib/email-template";
 import { parseCCEmails } from "@/lib/email";
 import { createError } from "@/lib/errors";
-import { ok, err, isErr } from "@/types/result.types";
-import { z } from "zod";
 
 /**
  * API Route để gửi email thông báo giải ngân
@@ -52,7 +50,7 @@ export async function POST(request: NextRequest) {
     const validationResult = LoanDisbursementSchema.safeParse(rawData);
     
     if (!validationResult.success) {
-      const errorDetails = validationResult.error.errors.map(e => ({
+      const errorDetails = validationResult.error.issues.map((e) => ({
         path: e.path.join('.'),
         message: e.message
       }));
