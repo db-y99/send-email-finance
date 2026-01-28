@@ -29,13 +29,28 @@ export async function sendLoanDisbursementEmail(
     const subject = getEmailSubject(data.contract_code);
     const ccEmails = parseCCEmails(data.cc_emails);
 
+    // Convert File attachments to Resend format
+    const attachments = data.attachments
+      ? await Promise.all(
+          data.attachments.map(async (file) => {
+            const buffer = await file.arrayBuffer();
+            const base64Content = Buffer.from(buffer).toString("base64");
+            return {
+              filename: file.name,
+              content: base64Content,
+            };
+          })
+        )
+      : undefined;
+
     // Resend API payload
     const payload = {
-      from: env.FROM_EMAIL,
+      from: `Bộ phận Tài chính <${env.FROM_EMAIL}>`,
       to: data.customer_email,
-      cc: ccEmails.length > 0 ? ccEmails : undefined,
+      cc: ccEmails.length > 0 ? [...ccEmails, env.FROM_EMAIL] : undefined,
       subject: subject,
       html: emailHTML,
+      attachments: attachments,
     };
 
     const response = await fetch("https://api.resend.com/emails", {
