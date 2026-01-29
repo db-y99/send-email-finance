@@ -12,7 +12,6 @@ export const siteConfig = {
       label: "Giải ngân",
       href: "/disbursement",
     },
-
   ],
   navMenuItems: [
     {

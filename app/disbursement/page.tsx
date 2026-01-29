@@ -6,6 +6,7 @@ import { EmailPreviewModal } from "@/components/email-preview-modal";
 import { TLoanDisbursementData, sampleLoanDisbursementData } from "@/types/loan-disbursement";
 import { Button } from "@heroui/button";
 import { title } from "@/components/primitives";
+import { addToast } from "@heroui/toast";
 
 // Hoist static JSX elements (rule 6.3)
 const LoadingOverlay = (
@@ -61,18 +62,30 @@ export default function DisbursementPage() {
 
         // Xử lý response theo Result pattern
         if (result.ok) {
-          alert(`Email đã được gửi thành công đến ${data.customer_email}`);
+          addToast({
+            title: "Gửi email thành công",
+            description: `Email đã được gửi thành công đến ${data.customer_email}`,
+            color: "success",
+          });
           // Reset form sau khi gửi thành công
           window.location.reload();
         } else {
           // Hiển thị lỗi từ Result pattern
           const errorMessage = result.error?.message || "Đã có lỗi xảy ra khi gửi email";
-          alert(`Lỗi: ${errorMessage}`);
+          addToast({
+            title: "Lỗi gửi email",
+            description: errorMessage,
+            color: "danger",
+          });
           console.error("Email send error:", result.error);
         }
       } catch (error) {
         console.error("Critical error sending email:", error);
-        alert("Đã có lỗi hệ thống xảy ra khi gửi email. Vui lòng thử lại.");
+        addToast({
+          title: "Lỗi hệ thống",
+          description: "Đã có lỗi hệ thống xảy ra khi gửi email. Vui lòng thử lại.",
+          color: "danger",
+        });
       }
     });
   };
